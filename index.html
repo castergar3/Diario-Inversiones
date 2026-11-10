@@ -106,6 +106,20 @@ input{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);ba
   </div>
 </dialog>
 
+<dialog id="xd">
+  <h2 id="xt"></h2>
+  <p class="hint" id="xh"></p>
+  <textarea id="xa" rows="8" style="width:100%;margin-top:10px;padding:10px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:12px monospace"></textarea>
+  <div class="acts" style="flex-wrap:wrap">
+    <button class="btn main" id="xc">Copiar</button>
+    <button class="btn" id="xs">Compartir</button>
+    <button class="btn" id="xdw">Descargar archivo</button>
+    <button class="btn main" id="xr" hidden>Restaurar</button>
+    <button class="btn" id="xf" hidden>Elegir archivo</button>
+    <button class="btn" id="xx">Cerrar</button>
+  </div>
+</dialog>
+
 <script>
 const K='diario_inversiones_v1';
 const $=id=>document.getElementById(id);
@@ -193,7 +207,37 @@ document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
   $('ops').hidden=b.dataset.t!=='ops';$('gr').hidden=b.dataset.t!=='gr';
 });
 
-function save(name,text,type){
+let cur=null;
+function openX(m,title,hint){
+  const out=m==='out';
+  $('xt').textContent=title;$('xh').textContent=hint;
+  $('xa').readOnly=out;$('xa').placeholder=out?'':'Pega aquí la copia de seguridad…';
+  $('xc').hidden=!out;$('xs').hidden=!out||!navigator.share;$('xdw').hidden=!out;
+  $('xr').hidden=out;$('xf').hidden=out;
+  $('xd').showModal();
+}
+function save(name,text,type,plain){
+  cur={name,text,type};$('xa').value=plain||text;
+  const j=name.endsWith('.json');
+  openX('out',j?'Copia de seguridad':'Exportar a Excel',j?
+    'Copia el texto y guárdalo en una nota, un correo o Drive. Para restaurar, pégalo en «Restaurar».':
+    'Copia el texto y pégalo en Excel o Google Sheets: se reparte en columnas. También puedes probar a descargar el archivo.');
+}
+$('xc').onclick=async()=>{
+  const t=$('xa').value;
+  try{await navigator.clipboard.writeText(t)}catch(e){$('xa').select();document.execCommand('copy')}
+  $('xc').textContent='¡Copiado!';setTimeout(()=>$('xc').textContent='Copiar',1500);
+};
+$('xs').onclick=()=>navigator.share({title:cur.name,text:$('xa').value}).catch(()=>{});
+$('xdw').onclick=()=>dl(cur.name,cur.text,cur.type);
+$('xx').onclick=()=>$('xd').close();
+$('xf').onclick=()=>$('file').click();
+$('xr').onclick=()=>{
+  try{const d=JSON.parse($('xa').value);if(!Array.isArray(d))throw 0;
+    if(confirm('Se reemplazarán los datos actuales por la copia ('+d.length+' operaciones). ¿Continuar?')){ops=d;persist();render();$('xd').close()}}
+  catch(x){alert('El texto no es una copia válida.')}
+};
+function dl(name,text,type){
   const blob=new Blob([text],{type});
   const f=new File([blob],name,{type});
   if(navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f]}).catch(()=>{});return}
@@ -210,16 +254,14 @@ $('xls').onclick=()=>{
   const c=closed(),g=c.filter(o=>pl(o)>0).reduce((s,o)=>s+pl(o),0),l=c.filter(o=>pl(o)<0).reduce((s,o)=>s+pl(o),0);
   rows.push([],['Ganancias','','','','','',cn(g.toFixed(2))],['Pérdidas','','','','','',cn(l.toFixed(2))],['Neto','','','','','',cn((g+l).toFixed(2))]);
   const csv='\ufeff'+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(';')).join('\r\n');
-  save('inversiones.csv',csv,'text/csv');
+  save('inversiones.csv',csv,'text/csv',rows.map(r=>r.join('\t')).join('\n'));
 };
 $('bak').onclick=()=>save('copia-inversiones.json',JSON.stringify(ops),'application/json');
-$('imp').onclick=()=>$('file').click();
+$('imp').onclick=()=>{$('xa').value='';openX('imp','Restaurar copia','Pega el texto de tu copia de seguridad o elige el archivo .json.')};
 $('file').onchange=e=>{
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();
-  r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d))throw 0;
-    if(confirm('Se reemplazarán los datos actuales por la copia ('+d.length+' operaciones). ¿Continuar?')){ops=d;persist();render()}}
-    catch(x){alert('El archivo no es una copia válida.')}};
+  r.onload=()=>{$('xa').value=r.result};
   r.readAsText(f);e.target.value='';
 };
 render();
