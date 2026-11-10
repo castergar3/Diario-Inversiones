@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14213d">
+<title>Diario de inversiones</title>
+<style>
+:root{--bg:#eef1f6;--card:#fff;--ink:#14213d;--mute:#6b7691;--line:#dde3ee;--gain:#0b8f6a;--loss:#d6455d;--acc:#3b4cca;--gainbg:#e1f5ee;--lossbg:#fbe5e9;box-sizing:border-box}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1424;--card:#172038;--ink:#eaf0ff;--mute:#8f9bb8;--line:#27324f;--gain:#34d3a0;--loss:#ff7a90;--acc:#8c9bff;--gainbg:#12352f;--lossbg:#3b1d2a}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{padding:env(safe-area-inset-top) 0 calc(96px + env(safe-area-inset-bottom));max-width:640px;margin:auto}
+.num{font-variant-numeric:tabular-nums}
+.hero{padding:28px 20px 8px}
+.hero small{color:var(--mute);font-size:14px}
+.hero .big{font-size:44px;font-weight:800;letter-spacing:-1.5px;margin:2px 0 0}
+.pos{color:var(--gain)}.neg{color:var(--loss)}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:14px 16px}
+.stat{background:var(--card);border-radius:16px;padding:12px}
+.stat span{display:block;font-size:12px;color:var(--mute)}
+.stat b{font-size:16px}
+.tabs{display:flex;gap:6px;margin:6px 16px 12px;background:var(--line);padding:4px;border-radius:14px}
+.tabs button{flex:1;border:0;background:none;padding:10px;border-radius:10px;font:600 14px inherit;font-family:inherit;color:var(--mute)}
+.tabs button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px #0002}
+.list{padding:0 16px;display:grid;gap:10px}
+.op{background:var(--card);border-radius:16px;padding:14px;display:flex;justify-content:space-between;gap:10px;border-left:5px solid var(--line);cursor:pointer}
+.op.g{border-left-color:var(--gain)}.op.l{border-left-color:var(--loss)}
+.op h3{margin:0 0 4px;font-size:16px}
+.op p{margin:0;font-size:13px;color:var(--mute)}
+.op .r{text-align:right;white-space:nowrap}
+.op .r b{font-size:17px;display:block}
+.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;background:var(--line);color:var(--mute)}
+.empty{text-align:center;color:var(--mute);padding:40px 24px;line-height:1.5}
+.chart{background:var(--card);border-radius:16px;margin:0 16px 12px;padding:14px}
+.chart h2{margin:0 0 10px;font-size:15px}
+.scroll{overflow-x:auto}
+.bar{position:fixed;left:0;right:0;bottom:0;display:flex;gap:10px;justify-content:center;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bg) 40%)}
+.bar>*{max-width:300px}
+.btn{border:0;border-radius:14px;padding:14px 18px;font:700 15px inherit;font-family:inherit;background:var(--card);color:var(--ink);box-shadow:0 2px 8px #0002}
+.btn.main{background:var(--acc);color:#fff;flex:1}
+.btn.del{color:var(--loss);background:var(--lossbg);box-shadow:none}
+dialog{border:0;border-radius:22px;padding:20px;width:min(92vw,460px);background:var(--card);color:var(--ink)}
+dialog::backdrop{background:#0008}
+dialog h2{margin:0 0 12px}
+label{display:block;font-size:13px;color:var(--mute);margin:10px 0 4px}
+input{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:16px inherit;font-family:inherit}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.err{color:var(--loss);font-size:13px;min-height:18px;margin-top:8px}
+.acts{display:flex;gap:10px;margin-top:10px}
+.hint{font-size:12px;color:var(--mute);margin:4px 0 0}
+.more{display:flex;gap:8px;justify-content:center;margin:18px 16px 0}
+.more .btn{font-size:13px;padding:10px 14px;box-shadow:none;border:1px solid var(--line)}
+</style>
+</head>
+<body>
+<div class="hero">
+  <small>Resultado neto (operaciones cerradas)</small>
+  <p class="big num" id="net">0,00 €</p>
+  <small id="pct"></small>
+</div>
+<div class="stats">
+  <div class="stat"><span>Ganancias</span><b class="pos num" id="gains">0,00 €</b></div>
+  <div class="stat"><span>Pérdidas</span><b class="neg num" id="losses">0,00 €</b></div>
+  <div class="stat"><span>Abiertas</span><b class="num" id="open">0,00 €</b></div>
+</div>
+<div class="tabs">
+  <button class="on" data-t="ops">Operaciones</button>
+  <button data-t="gr">Gráficos</button>
+</div>
+<div id="ops" class="list"></div>
+<div id="gr" hidden>
+  <div class="chart"><h2>Resultado por operación</h2><div class="scroll" id="c1"></div></div>
+  <div class="chart"><h2>Resultado acumulado</h2><div class="scroll" id="c2"></div></div>
+</div>
+<div class="more">
+  <button class="btn" id="bak">Copia de seguridad</button>
+  <button class="btn" id="imp">Restaurar</button>
+  <input type="file" id="file" accept=".json" hidden>
+</div>
+<div class="bar">
+  <button class="btn" id="xls">Exportar Excel</button>
+  <button class="btn main" id="add">+ Nueva inversión</button>
+</div>
+
+<dialog id="dlg">
+  <h2 id="dt">Nueva inversión</h2>
+  <label>Activo (acción, ETF, cripto…)</label>
+  <input id="f_name" placeholder="Ej. Apple" autocomplete="off">
+  <div class="two">
+    <div><label>Fecha de compra</label><input type="date" id="f_bd"></div>
+    <div><label>Importe comprado (€)</label><input type="number" step="0.01" inputmode="decimal" id="f_b"></div>
+  </div>
+  <div class="two">
+    <div><label>Fecha de venta</label><input type="date" id="f_sd"></div>
+    <div><label>Importe vendido (€)</label><input type="number" step="0.01" inputmode="decimal" id="f_s"></div>
+  </div>
+  <p class="hint">Deja la venta en blanco si la posición sigue abierta.</p>
+  <label>Comisiones e impuestos (€)</label>
+  <input type="number" step="0.01" inputmode="decimal" id="f_fee" placeholder="0,00">
+  <div class="err" id="err"></div>
+  <div class="acts">
+    <button class="btn del" id="del" hidden>Eliminar</button>
+    <button class="btn" id="cancel">Cancelar</button>
+    <button class="btn main" id="save">Guardar</button>
+  </div>
+</dialog>
+
+<script>
+const K='diario_inversiones_v1';
+const $=id=>document.getElementById(id);
+const eur=new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'});
+const sg=n=>(n>0?'+':'')+eur.format(n);
+const fd=s=>s?s.split('-').reverse().join('/'):'';
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let ops=[],editing=null;
+try{ops=JSON.parse(localStorage.getItem(K)||'[]')}catch(e){ops=[]}
+const persist=()=>{try{localStorage.setItem(K,JSON.stringify(ops))}catch(e){}};
+const pl=o=>o.sell==null?null:o.sell-o.buy-(o.fee||0);
+const closed=()=>ops.filter(o=>o.sell!=null).sort((a,b)=>a.sd.localeCompare(b.sd));
+
+function render(){
+  const c=closed();
+  const gains=c.filter(o=>pl(o)>0).reduce((s,o)=>s+pl(o),0);
+  const losses=c.filter(o=>pl(o)<0).reduce((s,o)=>s+pl(o),0);
+  const net=gains+losses;
+  const inv=c.reduce((s,o)=>s+o.buy,0);
+  const open=ops.filter(o=>o.sell==null).reduce((s,o)=>s+o.buy,0);
+  $('net').textContent=sg(net);$('net').className='big num '+(net>0?'pos':net<0?'neg':'');
+  $('pct').textContent=inv?'Rentabilidad sobre lo invertido: '+(net/inv*100).toFixed(2).replace('.',',')+' %':'';
+  $('gains').textContent=eur.format(gains);$('losses').textContent=eur.format(losses);$('open').textContent=eur.format(open);
+  const list=[...ops].sort((a,b)=>(b.sd||b.bd).localeCompare(a.sd||a.bd));
+  $('ops').innerHTML=list.length?list.map(o=>{
+    const p=pl(o),cls=p==null?'':p>=0?'g':'l';
+    return `<div class="op ${cls}" data-id="${o.id}"><div><h3>${esc(o.name)}</h3>
+    <p>${fd(o.bd)} → ${o.sd?fd(o.sd):'<span class="tag">abierta</span>'}</p>
+    <p class="num">Compra ${eur.format(o.buy)}${o.sell!=null?' · Venta '+eur.format(o.sell):''}</p></div>
+    <div class="r">${p==null?'<span class="num" style="color:var(--mute)">—</span>':`<b class="num ${p>=0?'pos':'neg'}">${sg(p)}</b><span class="num ${p>=0?'pos':'neg'}" style="font-size:13px">${(p/o.buy*100).toFixed(1).replace('.',',')} %</span>`}</div></div>`}).join('')
+    :'<div class="empty">Aún no hay inversiones.<br>Pulsa «Nueva inversión» para anotar la primera.</div>';
+  charts(c);
+}
+
+function charts(c){
+  if(!c.length){$('c1').innerHTML=$('c2').innerHTML='<div class="empty">Los gráficos aparecen al cerrar tu primera operación.</div>';return}
+  const vals=c.map(pl),n=vals.length,W=Math.max(320,n*46),H=190,pad=24;
+  const mx=Math.max(1,...vals.map(Math.abs)),zero=H/2;
+  const sc=v=>v/mx*(H/2-pad);
+  let b='';
+  vals.forEach((v,i)=>{
+    const x=i*(W/n)+(W/n)*.18,w=(W/n)*.64,h=Math.abs(sc(v));
+    b+=`<rect x="${x}" y="${v>=0?zero-h:zero}" width="${w}" height="${Math.max(h,1)}" rx="4" style="fill:var(${v>=0?'--gain':'--loss'})"/>
+    <text x="${x+w/2}" y="${H-4}" font-size="10" text-anchor="middle" style="fill:var(--mute)">${esc(c[i].name.slice(0,6))}</text>`});
+  $('c1').innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}"><line x1="0" x2="${W}" y1="${zero}" y2="${zero}" style="stroke:var(--line)"/>${b}</svg>`;
+  let acc=0;const cum=vals.map(v=>acc+=v);
+  const lo=Math.min(0,...cum),hi=Math.max(0,...cum),rg=(hi-lo)||1,W2=Math.max(320,n*46),H2=190;
+  const X=i=>n==1?W2/2:20+i*(W2-40)/(n-1),Y=v=>15+(hi-v)/rg*(H2-45);
+  const pts=cum.map((v,i)=>X(i)+','+Y(v)).join(' ');
+  const last=cum[n-1];
+  $('c2').innerHTML=`<svg viewBox="0 0 ${W2} ${H2}" width="${W2}" height="${H2}"><line x1="0" x2="${W2}" y1="${Y(0)}" y2="${Y(0)}" style="stroke:var(--line)"/>
+  <polyline points="${pts}" fill="none" stroke-width="3" stroke-linejoin="round" style="stroke:var(${last>=0?'--gain':'--loss'})"/>
+  ${cum.map((v,i)=>`<circle cx="${X(i)}" cy="${Y(v)}" r="4" style="fill:var(--card);stroke:var(${last>=0?'--gain':'--loss'});stroke-width:2"/>`).join('')}
+  <text x="${W2-4}" y="${H2-6}" font-size="11" text-anchor="end" style="fill:var(--mute)">${fd(c[n-1].sd)} · ${sg(last)}</text></svg>`;
+}
+
+function open_(id){
+  editing=id;const o=ops.find(x=>x.id===id)||{};
+  $('dt').textContent=id?'Editar inversión':'Nueva inversión';
+  $('f_name').value=o.name||'';$('f_bd').value=o.bd||new Date().toISOString().slice(0,10);
+  $('f_b').value=o.buy??'';$('f_sd').value=o.sd||'';$('f_s').value=o.sell??'';$('f_fee').value=o.fee||'';
+  $('err').textContent='';$('del').hidden=!id;$('dlg').showModal();
+}
+$('add').onclick=()=>open_(null);
+$('cancel').onclick=()=>$('dlg').close();
+$('ops').onclick=e=>{const el=e.target.closest('.op');if(el)open_(el.dataset.id)};
+$('del').onclick=()=>{if(confirm('¿Eliminar esta inversión?')){ops=ops.filter(o=>o.id!==editing);persist();render();$('dlg').close()}};
+$('save').onclick=()=>{
+  const name=$('f_name').value.trim(),bd=$('f_bd').value,sd=$('f_sd').value;
+  const buy=parseFloat($('f_b').value),sRaw=$('f_s').value,sell=sRaw===''?null:parseFloat(sRaw),fee=parseFloat($('f_fee').value)||0;
+  let m='';
+  if(!name)m='Escribe el nombre del activo.';
+  else if(!bd)m='Indica la fecha de compra.';
+  else if(isNaN(buy)||buy<=0)m='El importe comprado debe ser mayor que 0.';
+  else if(sell!=null&&!sd)m='Indica la fecha de venta.';
+  else if(sell==null&&sd)m='Indica el importe vendido.';
+  else if(sd&&sd<bd)m='La venta no puede ser anterior a la compra.';
+  if(m){$('err').textContent=m;return}
+  const rec={id:editing||String(Date.now()),name,bd,buy,sd:sd||null,sell,fee};
+  ops=editing?ops.map(o=>o.id===editing?rec:o):[...ops,rec];
+  persist();render();$('dlg').close();
+};
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  $('ops').hidden=b.dataset.t!=='ops';$('gr').hidden=b.dataset.t!=='gr';
+});
+
+function save(name,text,type){
+  const blob=new Blob([text],{type});
+  const f=new File([blob],name,{type});
+  if(navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f]}).catch(()=>{});return}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
+  document.body.appendChild(a);a.click();a.remove();
+}
+const cn=n=>String(n).replace('.',',');
+$('xls').onclick=()=>{
+  const rows=[['Activo','Fecha compra','Importe compra (€)','Fecha venta','Importe venta (€)','Comisiones (€)','Resultado (€)','Rentabilidad (%)']];
+  [...ops].sort((a,b)=>a.bd.localeCompare(b.bd)).forEach(o=>{
+    const p=pl(o);
+    rows.push([o.name,fd(o.bd),cn(o.buy.toFixed(2)),fd(o.sd),o.sell==null?'':cn(o.sell.toFixed(2)),cn((o.fee||0).toFixed(2)),p==null?'':cn(p.toFixed(2)),p==null?'':cn((p/o.buy*100).toFixed(2))]);
+  });
+  const c=closed(),g=c.filter(o=>pl(o)>0).reduce((s,o)=>s+pl(o),0),l=c.filter(o=>pl(o)<0).reduce((s,o)=>s+pl(o),0);
+  rows.push([],['Ganancias','','','','','',cn(g.toFixed(2))],['Pérdidas','','','','','',cn(l.toFixed(2))],['Neto','','','','','',cn((g+l).toFixed(2))]);
+  const csv='\ufeff'+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(';')).join('\r\n');
+  save('inversiones.csv',csv,'text/csv');
+};
+$('bak').onclick=()=>save('copia-inversiones.json',JSON.stringify(ops),'application/json');
+$('imp').onclick=()=>$('file').click();
+$('file').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d))throw 0;
+    if(confirm('Se reemplazarán los datos actuales por la copia ('+d.length+' operaciones). ¿Continuar?')){ops=d;persist();render()}}
+    catch(x){alert('El archivo no es una copia válida.')}};
+  r.readAsText(f);e.target.value='';
+};
+render();
+</script>
+</body>
+</html>
